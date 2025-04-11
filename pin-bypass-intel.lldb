@@ -1,0 +1,198 @@
+settings set target.x86-disassembly-flavor intel
+expr void* $SecTrustEvaluate_2nd
+expr void* $SecTrustEvaluateWithError_2nd
+script
+import sys
+import re
+interp = lldb.debugger.GetCommandInterpreter()
+result = lldb.SBCommandReturnObject()
+marker_flag = False
+def print_flush(str):
+    print(str)
+    sys.stdout.flush()
+
+def execute_command(command):
+    global interp, result
+    interp.HandleCommand(command, result)
+    if result.Succeeded():
+        print_flush(result.GetOutput().strip())
+    else:
+        print_flush("Error: " + result.GetError().strip())
+
+def callback1():
+    global marker_flag
+    marker_flag = True
+    print_flush("=== SecTrustEvaluate Start ===")
+    print_flush("register read rsi")
+    execute_command("register read rsi")
+    print_flush("expr $SecTrustEvaluate_2nd = (void*)$rsi")
+    execute_command("expr $SecTrustEvaluate_2nd = (void*)$rsi")
+    execute_command("continue")
+
+def callback2():
+    global marker_flag
+    if marker_flag:
+        print_flush("=== SecTrustEvaluate End ===")
+        print_flush("p $SecTrustEvaluate_2nd")
+        execute_command("p $SecTrustEvaluate_2nd")
+        print_flush("memory read $SecTrustEvaluate_2nd")
+        execute_command("memory read $SecTrustEvaluate_2nd")
+        print_flush("memory write $SecTrustEvaluate_2nd 0x1")
+        execute_command("memory write $SecTrustEvaluate_2nd 0x1")
+        print_flush("memory read $SecTrustEvaluate_2nd")
+        execute_command("memory read $SecTrustEvaluate_2nd")
+        print_flush("register read rax")
+        execute_command("register read rax")
+        print_flush("register write rax 0")
+        execute_command("register write rax 0")
+        marker_flag = False
+    execute_command("continue")
+
+def callback3():
+    print_flush("=== SecTrustEvaluateWithError Start ===")
+    print_flush("register read rsi")
+    execute_command("register read rsi")
+    print_flush("expr $SecTrustEvaluateWithError_2nd = (void*)$rsi")
+    execute_command("expr $SecTrustEvaluateWithError_2nd = (void*)$rsi")
+    print_flush("register write rsi 0")
+    execute_command("register write rsi 0")
+    execute_command("continue")
+
+def callback4():
+    print_flush("=== SecTrustEvaluateWithError End ===")
+    print_flush("p $SecTrustEvaluateWithError_2nd")
+    execute_command("p $SecTrustEvaluateWithError_2nd")
+    print_flush("memory read $SecTrustEvaluateWithError_2nd")
+    execute_command("memory read $SecTrustEvaluateWithError_2nd")
+    print_flush("memory write $SecTrustEvaluateWithError_2nd 0")
+    execute_command("memory write $SecTrustEvaluateWithError_2nd 0")
+    print_flush("memory read $SecTrustEvaluateWithError_2nd")
+    execute_command("memory read $SecTrustEvaluateWithError_2nd")
+    print_flush("register read rax")
+    execute_command("register read rax")
+    print_flush("register write rax 1")
+    execute_command("register write rax 1")
+    execute_command("continue")
+
+def callback5():
+    print_flush("=== SSL_get_psk_identity End ===")
+    print_flush("register read rax")
+    execute_command("register read rax")
+    print_flush("memory read $rax")
+    execute_command("memory read $rax")
+    print_flush('memory write $rax "notareaalPSKidentity\0"')
+    execute_command('memory write $rax "notareaalPSKidentity\0"')
+    print_flush("memory read $rax")
+    execute_command("memory read $rax")
+    execute_command("continue")
+
+def callback6():
+    print_flush("=== boringssl_context_set_verify_mode End ===")
+    print_flush("register read rax")
+    execute_command("register read rax")
+    print_flush("register write rax 0")
+    execute_command("register write rax 0")
+    execute_command("continue")
+
+def callback7():
+    print_flush("=== SSL_CTX_set_custom_verify Start ===")
+    print_flush("register read rsi")
+    execute_command("register read rsi")
+    print_flush("register read rdx")
+    execute_command("register read rdx")
+    execute_command("continue")
+
+def callback8():
+    print_flush("=== boringssl_context_certificate_verify_callback End ===")
+    print_flush("register read rax")
+    execute_command("register read rax")
+    print_flush("register write rax 0")
+    execute_command("register write rax 0")
+    execute_command("continue")
+
+def callback9():
+    print_flush("=== custom certificate verification ===")
+    print_flush("register read bl")
+    execute_command("register read bl")
+    print_flush("register write bl 1")
+    execute_command("register write bl 1")
+    execute_command("continue")
+
+def extract_addr(line):
+    # Strip ANSI color codes
+    ansi_escape = re.compile(r'\x1b\[[0-9;]*m')
+    clean_line = ansi_escape.sub('', line)
+    # Match the first hexadecimal address in the line
+    match = re.search(r'0x[0-9a-fA-F]+', clean_line)
+    if match:
+        return match.group(0)
+    return None
+
+def find_ret(func_name):
+    global interp, result
+    addr = []
+    interp.HandleCommand(f"disassemble --name {func_name}", result)
+    if result.Succeeded():
+        for line in result.GetOutput().strip().split("\n"):
+            if ": ret" in line:
+                a = extract_addr(line)
+                print_flush(f"ret in {func_name}: {a}")
+                addr.append(a)
+    else:
+        print_flush("Error: " + result.GetError().strip())
+    return addr
+
+def find_base(binary_name):
+    global interp, result
+    addr = []
+    interp.HandleCommand(f"target modules list", result)
+    if result.Succeeded():
+        for line in result.GetOutput().strip().split("\n"):
+            if binary_name.lower() in line.lower():
+                a = extract_addr(line)
+                print_flush(f"base of {binary_name}: {a}")
+                addr.append(a)
+    else:
+        print_flush("Error: " + result.GetError().strip())
+    return addr
+
+def main():
+    # callback1() at SecTrustEvaluate start
+    execute_command("b SecTrustEvaluate")
+    execute_command('br command add -o "script callback1()"')
+    # callback2() at SecTrustEvaluate end
+    for addr in find_ret("SecTrustEvaluateInternal"):
+        execute_command(f"b {addr}")
+        execute_command('br command add -o "script callback2()"')
+    # callback3() at SecTrustEvaluateWithError start
+    execute_command("b SecTrustEvaluateWithError")
+    execute_command('br command add -o "script callback3()"')
+    # callback4() at SecTrustEvaluateWithError end
+    for addr in find_ret("SecTrustEvaluateWithError"):
+        execute_command(f"b {addr}")
+        execute_command('br command add -o "script callback4()"')
+    # callback5() at SSL_get_psk_identity end
+    for addr in find_ret("SSL_get_psk_identity"):
+        execute_command(f"b {addr}")
+        execute_command('br command add -o "script callback5()"')
+    # callback6() at boringssl_context_set_verify_mode end
+    for addr in find_ret("boringssl_context_set_verify_mode"):
+        execute_command(f"b {addr}")
+        execute_command('br command add -o "script callback6()"')
+    # callback7() at SSL_CTX_set_custom_verify end
+    execute_command("b SSL_CTX_set_custom_verify")
+    execute_command('br command add -o "script callback7()"')
+    # callback8() at boringssl_context_certificate_verify_callback end
+    for addr in find_ret("boringssl_context_certificate_verify_callback"):
+        execute_command(f"b {addr}")
+        execute_command('br command add -o "script callback8()"')
+    # callback9() at custom certificate verification
+    for addr in find_base("Okta Verify"):
+        # offset = 0x6F564E
+        addr = hex(int(addr, 16) + 0x6F564E)
+        execute_command(f"b {addr}")
+        execute_command('br command add -o "script callback9()"')
+
+
+main()
+exit()
