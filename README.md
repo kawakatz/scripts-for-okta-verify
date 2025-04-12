@@ -11,7 +11,7 @@ To implement the ARM version, I need to update the register names and review the
 3. Execute "continue" in lldb
 ```
 
-#### How It Works
+#### How It Works (for Intel Mac)
 - **SecTrustEvaluate**  
   - Writes `0x1` to the memory location pointed to by the second argument.  
   - Sets the return value register (`rax`) to `0`, indicating success.
