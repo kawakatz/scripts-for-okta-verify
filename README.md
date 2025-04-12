@@ -1,5 +1,5 @@
 # Scripts for Okta Verify
-Details: [Okta Terrify vs macOS](https://kawakatz.io/notes/okta-terrify-on-maos/)
+Details: [Okta Terrify vs macOS](https://kawakatz.io/notes/okta-terrify-vs-macos/)
 
 ## Usage
 #### Certificate Pinning Bypass
